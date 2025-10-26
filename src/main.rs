@@ -1,5 +1,5 @@
 use clap::{Parser, ValueEnum};
-use indicatif::ProgressBar;
+use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use std::fs::OpenOptions;
 use std::io::BufReader;
@@ -38,6 +38,7 @@ struct Args {
 }
 
 //TODO: move logic to lib
+//TODO: handle slashes e.g. add missing / at path end for files parameter
 
 fn main() {
     let args = Args::parse();
@@ -47,11 +48,28 @@ fn main() {
     }
 }
 
-///TODO: progress bar
 fn generate_files(args: Args) {
     let file = File::open(args.path).unwrap();
+    let file_length = file.metadata().unwrap().len();
     let file = BufReader::new(file);
     let parser = EventReader::new(file);
+    let bar = if args.number_of_articles != -1 {
+        let bar = ProgressBar::new(args.number_of_articles as u64);
+        bar.set_style(
+            ProgressStyle::default_bar()
+                .template("{bar:40.white/gray} {pos}/{len} ({eta})")
+                .unwrap(),
+        );
+        bar
+    } else {
+        let bar = ProgressBar::new(file_length);
+        bar.set_style(
+            ProgressStyle::default_bar()
+                .template("{bar:40.white/gray} {bytes}/{total_bytes} ({eta})")
+                .unwrap(),
+        );
+        bar
+    };
     let mut current_element_name = String::new();
     let mut current_file: Option<File> = None;
     let mut number_of_files_written = 0;
@@ -82,6 +100,11 @@ fn generate_files(args: Args) {
                         .write_all(text.as_bytes())
                         .unwrap();
                     number_of_files_written += 1;
+                    if args.number_of_articles != -1 {
+                        bar.inc(1);
+                    } else {
+                        bar.inc(text.len() as u64);
+                    }
                 }
             }
             Err(e) => {
@@ -91,9 +114,12 @@ fn generate_files(args: Args) {
             _ => {}
         }
     }
+    bar.finish();
 }
+
 fn generate_single_file_with_index(args: Args) {
     let file = File::open(args.path).unwrap();
+    let file_length = file.metadata().unwrap().len();
     let file = BufReader::new(file);
     let parser = EventReader::new(file);
     let mut current_element_name = String::new();
@@ -109,8 +135,23 @@ fn generate_single_file_with_index(args: Args) {
         .write(true)
         .open(format!("{}.csv", args.output_path))
         .unwrap();
-    //TODO: handle if number_of_articles is -1
-    let bar = ProgressBar::new(args.number_of_articles as u64);
+    let bar = if args.number_of_articles != -1 {
+        let bar = ProgressBar::new(args.number_of_articles as u64);
+        bar.set_style(
+            ProgressStyle::default_bar()
+                .template("{bar:40.white/gray} {pos}/{len} ({eta})")
+                .unwrap(),
+        );
+        bar
+    } else {
+        let bar = ProgressBar::new(file_length);
+        bar.set_style(
+            ProgressStyle::default_bar()
+                .template("{bar:40.white/gray} {bytes}/{total_bytes} ({eta})")
+                .unwrap(),
+        );
+        bar
+    };
     let mut current_text_offset = 0;
     let mut number_of_articles_extracted = 0;
     let mut offsets: Vec<usize> = Vec::new();
@@ -135,7 +176,11 @@ fn generate_single_file_with_index(args: Args) {
                     offsets.push(current_text_offset);
                     current_text_offset += text.len();
                     number_of_articles_extracted += 1;
-                    bar.inc(1);
+                    if args.number_of_articles != -1 {
+                        bar.inc(1);
+                    } else {
+                        bar.inc(text.len() as u64);
+                    }
                 }
             }
             Err(e) => {
