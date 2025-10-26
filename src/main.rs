@@ -18,28 +18,29 @@ enum OutputFormat {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// path to the xml file containing the dump
+    /// Path to the xml file containing the dump
     #[arg(short, long)]
     path: String,
 
-    /// number of articles to extract. -1 will extract all articles.
+    /// Number of articles to extract. -1 will extract all articles.
     #[arg(short, long, default_value_t = -1)]
     number_of_articles: i64,
 
-    /// where the output should be written to
-    #[arg(short, long)]
+    /// Where the output should be written to
+    ///     files: Writes all files to the output_path directory
+    ///     single-file-with-index: Generates two files <output_path>.txt and <output_path>.csv
+    #[arg(short, long, verbatim_doc_comment)]
     output_path: String,
 
-    /// the format of the output:
-    ///     files: generates one file per article
-    ///     single-file-with-index: generates a single files containing all article texts and a CSV
-    ///     file. Every value in the CSV file represents the offset to an article.
-    #[arg(long)]
+    /// Specify the format of the output:
+    ///     files: Generates one file per article
+    ///     single-file-with-index: Generates a single files containing all article texts and a CSV file.
+    ///                             Every value in the CSV file represents the offset to an article.
+    #[arg(long, verbatim_doc_comment)]
     output_format: OutputFormat,
 }
 
 //TODO: move logic to lib
-//TODO: handle slashes e.g. add missing / at path end for files parameter
 
 fn main() {
     let args = Args::parse();
