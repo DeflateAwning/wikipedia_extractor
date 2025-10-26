@@ -3,6 +3,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use std::fs::OpenOptions;
 use std::io::BufReader;
+use std::path;
 use std::{fs::File, io::Write};
 
 use xml::reader::{EventReader, XmlEvent};
@@ -50,6 +51,11 @@ fn main() {
 
 fn generate_files(args: Args) {
     let file = File::open(args.path).unwrap();
+    let path_out = path::absolute(&args.output_path).unwrap();
+    if !path_out.is_dir() {
+        println!("The output path should be a directory.");
+        return;
+    }
     let file_length = file.metadata().unwrap().len();
     let file = BufReader::new(file);
     let parser = EventReader::new(file);
@@ -90,8 +96,10 @@ fn generate_files(args: Args) {
             Ok(XmlEvent::Characters(text)) => {
                 if current_element_name == "title" {
                     let title = text.trim().replace(" ", "_").replace("/", "__");
-                    current_file =
-                        Some(File::create(format!("{}{}.txt", args.output_path, title)).unwrap());
+                    current_file = Some(
+                        File::create(format!("{}/{}.txt", path_out.to_str().unwrap(), title))
+                            .unwrap(),
+                    );
                 } else if current_element_name == "text" {
                     let text = text.trim();
                     current_file
