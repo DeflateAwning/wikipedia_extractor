@@ -2,11 +2,10 @@ use clap::{Parser, ValueEnum};
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use std::fs::OpenOptions;
-use std::io::BufReader;
+use std::io::Result;
 use std::path;
 use std::{fs::File, io::Write};
-
-use xml::reader::{EventReader, XmlEvent};
+use wiki_extractor::WikipediaIterator;
 
 #[derive(Debug, Clone, ValueEnum)]
 enum OutputFormat {
@@ -40,26 +39,23 @@ struct Args {
     output_format: OutputFormat,
 }
 
-//TODO: move logic to lib
-
 fn main() {
     let args = Args::parse();
     match args.output_format {
         OutputFormat::Files => generate_files(args),
         OutputFormat::SingleFileWithIndex => generate_single_file_with_index(args),
     }
+    .unwrap();
 }
 
-fn generate_files(args: Args) {
-    let file = File::open(args.path).unwrap();
-    let path_out = path::absolute(&args.output_path).unwrap();
+fn generate_files(args: Args) -> Result<()> {
+    let file = File::open(&args.path)?;
+    let path_out = path::absolute(&args.output_path)?;
     if !path_out.is_dir() {
         println!("The output path should be a directory.");
-        return;
+        return Ok(());
     }
     let file_length = file.metadata().unwrap().len();
-    let file = BufReader::new(file);
-    let parser = EventReader::new(file);
     let bar = if args.number_of_articles != -1 {
         let bar = ProgressBar::new(args.number_of_articles as u64);
         bar.set_style(
@@ -77,61 +73,31 @@ fn generate_files(args: Args) {
         );
         bar
     };
-    let mut current_element_name = String::new();
-    let mut current_file: Option<File> = None;
-    let mut number_of_files_written = 0;
-    for e in parser.into_iter() {
-        if args.number_of_articles > 0 && args.number_of_articles <= number_of_files_written {
-            break;
-        }
-        match e {
-            Ok(XmlEvent::StartElement { name, .. }) => {
-                current_element_name = name
-                    .to_string()
-                    .split('}')
-                    .next_back()
-                    .unwrap()
-                    .trim()
-                    .to_string();
-            }
-            Ok(XmlEvent::Characters(text)) => {
-                if current_element_name == "title" {
-                    let title = text.trim().replace(" ", "_").replace("/", "__");
-                    current_file = Some(
-                        File::create(format!("{}/{}.txt", path_out.to_str().unwrap(), title))
-                            .unwrap(),
-                    );
-                } else if current_element_name == "text" {
-                    let text = text.trim();
-                    current_file
-                        .take()
-                        .unwrap()
-                        .write_all(text.as_bytes())
-                        .unwrap();
-                    number_of_files_written += 1;
-                    if args.number_of_articles != -1 {
-                        bar.inc(1);
-                    } else {
-                        bar.inc(text.len() as u64);
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("Error: {e}");
-                break;
-            }
-            _ => {}
+    let article_iter = WikipediaIterator::new(&args.path)?;
+    for article in article_iter.take(if args.number_of_articles > 0 {
+        args.number_of_articles as usize
+    } else {
+        usize::MAX
+    }) {
+        let mut current_file = File::create(format!(
+            "{}/{}.txt",
+            path_out.to_str().unwrap(),
+            article.title
+        ))?;
+        current_file.write_all(article.content.as_bytes())?;
+        if args.number_of_articles != -1 {
+            bar.inc(1);
+        } else {
+            bar.inc(article.content.len() as u64);
         }
     }
     bar.finish();
+    Ok(())
 }
 
-fn generate_single_file_with_index(args: Args) {
-    let file = File::open(args.path).unwrap();
+fn generate_single_file_with_index(args: Args) -> Result<()> {
+    let file = File::open(&args.path).unwrap();
     let file_length = file.metadata().unwrap().len();
-    let file = BufReader::new(file);
-    let parser = EventReader::new(file);
-    let mut current_element_name = String::new();
     File::create(format!("{}.txt", args.output_path)).unwrap();
     File::create(format!("{}.csv", args.output_path)).unwrap();
     let mut content_file = OpenOptions::new()
@@ -162,41 +128,21 @@ fn generate_single_file_with_index(args: Args) {
         bar
     };
     let mut current_text_offset = 0;
-    let mut number_of_articles_extracted = 0;
     let mut offsets: Vec<usize> = Vec::new();
-    for e in parser.into_iter() {
-        if args.number_of_articles > 0 && args.number_of_articles <= number_of_articles_extracted {
-            break;
-        }
-        match e {
-            Ok(XmlEvent::StartElement { name, .. }) => {
-                current_element_name = name
-                    .to_string()
-                    .split('}')
-                    .next_back()
-                    .unwrap()
-                    .trim()
-                    .to_string();
-            }
-            Ok(XmlEvent::Characters(text)) => {
-                if current_element_name == "text" {
-                    let text = text.trim();
-                    content_file.write_all(text.as_bytes()).unwrap();
-                    offsets.push(current_text_offset);
-                    current_text_offset += text.len();
-                    number_of_articles_extracted += 1;
-                    if args.number_of_articles != -1 {
-                        bar.inc(1);
-                    } else {
-                        bar.inc(text.len() as u64);
-                    }
-                }
-            }
-            Err(e) => {
-                eprintln!("Error: {e}");
-                break;
-            }
-            _ => {}
+    let article_iter = WikipediaIterator::new(&args.path)?;
+    for article in article_iter.take(if args.number_of_articles > 0 {
+        args.number_of_articles as usize
+    } else {
+        usize::MAX
+    }) {
+        let text = article.content.trim();
+        content_file.write_all(text.as_bytes()).unwrap();
+        offsets.push(current_text_offset);
+        current_text_offset += text.len();
+        if args.number_of_articles != -1 {
+            bar.inc(1);
+        } else {
+            bar.inc(text.len() as u64);
         }
     }
     index_file
@@ -210,4 +156,5 @@ fn generate_single_file_with_index(args: Args) {
         )
         .unwrap();
     bar.finish();
+    Ok(())
 }
