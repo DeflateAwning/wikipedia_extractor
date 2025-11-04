@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 use std::io::BufReader;
 use std::{fs::File, io::Result};
 
