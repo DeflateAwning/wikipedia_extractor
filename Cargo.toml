@@ -2,6 +2,13 @@
 name = "wiki_extractor"
 version = "0.1.0"
 edition = "2024"
+authors = ["Lennard Kittner"]
+description = "A tool for parsing Wikipedia XML dumps."
+readme = "README.md"
+repository = "https://github.com/LennardKittner/wikipedia_extractor"
+license = "MIT"
+keywords = ["Wikipedia", "dump", "XML"]
+categories = ["science"]
 
 [dependencies]
 clap = { version = "4.5.48", features = ["derive"] }
