@@ -1,5 +1,5 @@
 # wikipedia_extractor
-A tool for parsing Wikipeida XML dumps.
+A tool for parsing Wikipedia XML dumps.
 
 ## Building
 ```
