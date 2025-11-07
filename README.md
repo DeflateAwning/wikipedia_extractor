@@ -45,6 +45,7 @@ cargo run --release -- -p ./wiki.xml -n 1000 -o ./out --output-format=files
 
 ## Usage Lib
 ```rust
+use wiki_extractor::WikipediaIterator;
 let article_iter = WikipediaIterator::new("./wiki.xml")?;
 for article in article_iter {
   println!("title: {}\n content: {}", article.title, article.content);
