@@ -33,12 +33,12 @@ Options:
 ```
 
 ### Example
-Generate `out.txt` and `out.csv`
+Generate `out.txt` and `out.csv` for the first 1000 articles
 ```
 cargo run --release -- -p ./wiki.xml -n 1000 -o ./out --output-format=single-file-with-index
 ```
 
-Generate one file per article in `out/`
+Generate one file per article in `out/` for the first 1000 articles
 ```
 cargo run --release -- -p ./wiki.xml -n 1000 -o ./out --output-format=files
 ```
