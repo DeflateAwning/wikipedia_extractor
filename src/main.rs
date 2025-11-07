@@ -1,4 +1,4 @@
-use clap::{Parser, ValueEnum};
+use clap::{CommandFactory, Parser, ValueEnum, error::ErrorKind};
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use std::fs::OpenOptions;
@@ -47,13 +47,45 @@ fn main() {
     }
     .unwrap();
 }
+//TODO: remove most unwraps
 
 fn generate_files(args: Args) -> Result<()> {
-    let file = File::open(&args.path)?;
-    let path_out = path::absolute(&args.output_path)?;
-    if !path_out.is_dir() {
+    let file = File::open(&args.path).unwrap_or_else(|err| {
+        Args::command()
+            .error(
+                ErrorKind::Io,
+                format!("Failed to open {}. {err}", args.path),
+            )
+            .exit()
+    });
+    let path_out = path::absolute(&args.output_path).unwrap_or_else(|err| {
+        Args::command()
+            .error(
+                ErrorKind::Io,
+                format!("Failed to create path from {}. {err}", args.output_path),
+            )
+            .exit()
+    });
+    if !path_out.exists() {
+        std::fs::create_dir_all(&path_out).unwrap_or_else(|err| {
+            Args::command()
+                .error(
+                    ErrorKind::Io,
+                    &format!(
+                        "Failed to create directory at {}. {err}",
+                        path_out.to_str().unwrap_or("")
+                    ),
+                )
+                .exit()
+        });
+    } else if !path_out.is_dir() {
         println!("The output path should be a directory.");
-        return Ok(());
+        Args::command()
+            .error(
+                ErrorKind::Io,
+                &format!("{} is not a directory.", path_out.to_str().unwrap_or("")),
+            )
+            .exit();
     }
     let file_length = file.metadata().unwrap().len();
     let bar = if args.number_of_articles != -1 {
@@ -79,12 +111,18 @@ fn generate_files(args: Args) -> Result<()> {
     } else {
         usize::MAX
     }) {
-        let mut current_file = File::create(format!(
-            "{}/{}.txt",
-            path_out.to_str().unwrap(),
-            article.title
-        ))?;
-        current_file.write_all(article.content.as_bytes())?;
+        let path = format!("{}/{}.txt", path_out.to_str().unwrap(), article.title);
+        let mut current_file = File::create(&path).unwrap_or_else(|err| {
+            Args::command()
+                .error(
+                    ErrorKind::Io,
+                    format!("Failed to create file {path}. {err}"),
+                )
+                .exit()
+        });
+        current_file
+            .write_all(article.content.as_bytes())
+            .expect("Failed to write article content.");
         if args.number_of_articles != -1 {
             bar.inc(1);
         } else {

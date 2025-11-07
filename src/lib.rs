@@ -39,13 +39,8 @@ impl Iterator for WikipediaIterator {
         for e in &mut self.iter {
             match e {
                 Ok(XmlEvent::StartElement { name, .. }) => {
-                    current_element_name = name
-                        .to_string()
-                        .split('}')
-                        .next_back()
-                        .unwrap()
-                        .trim()
-                        .to_string();
+                    current_element_name =
+                        name.to_string().split('}').next_back()?.trim().to_string();
                 }
                 Ok(XmlEvent::Characters(text)) => {
                     if current_element_name == "title" {
