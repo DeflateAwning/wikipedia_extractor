@@ -45,9 +45,12 @@ fn main() {
         OutputFormat::Files => generate_files(args),
         OutputFormat::SingleFileWithIndex => generate_single_file_with_index(args),
     }
-    .unwrap();
+    .unwrap_or_else(|err| {
+        Args::command()
+            .error(ErrorKind::Io, format!("{err}"))
+            .exit()
+    });
 }
-//TODO: remove most unwraps
 
 fn generate_files(args: Args) -> Result<()> {
     let file = File::open(&args.path).unwrap_or_else(|err| {
@@ -87,7 +90,7 @@ fn generate_files(args: Args) -> Result<()> {
             )
             .exit();
     }
-    let file_length = file.metadata().unwrap().len();
+    let file_length = file.metadata()?.len();
     let bar = if args.number_of_articles != -1 {
         let bar = ProgressBar::new(args.number_of_articles as u64);
         bar.set_style(
@@ -111,7 +114,11 @@ fn generate_files(args: Args) -> Result<()> {
     } else {
         usize::MAX
     }) {
-        let path = format!("{}/{}.txt", path_out.to_str().unwrap(), article.title);
+        let path = format!(
+            "{}/{}.txt",
+            path_out.to_str().expect("Strange output path"),
+            article.title
+        );
         let mut current_file = File::create(&path).unwrap_or_else(|err| {
             Args::command()
                 .error(
@@ -134,20 +141,57 @@ fn generate_files(args: Args) -> Result<()> {
 }
 
 fn generate_single_file_with_index(args: Args) -> Result<()> {
-    let file = File::open(&args.path).unwrap();
-    let file_length = file.metadata().unwrap().len();
-    File::create(format!("{}.txt", args.output_path)).unwrap();
-    File::create(format!("{}.csv", args.output_path)).unwrap();
+    let file = File::open(&args.path).unwrap_or_else(|err| {
+        Args::command()
+            .error(
+                ErrorKind::Io,
+                format!("Failed to open {}. {err}", args.path),
+            )
+            .exit()
+    });
+    let file_length = file.metadata()?.len();
+    let path_content_file = format!("{}.txt", args.output_path);
+    File::create(&path_content_file).unwrap_or_else(|err| {
+        Args::command()
+            .error(
+                ErrorKind::Io,
+                format!("Failed to create file {path_content_file}. {err}"),
+            )
+            .exit()
+    });
+    let path_index_file = format!("{}.csv", args.output_path);
+    File::create(&path_index_file).unwrap_or_else(|err| {
+        Args::command()
+            .error(
+                ErrorKind::Io,
+                format!("Failed to create file {path_index_file}. {err}"),
+            )
+            .exit()
+    });
     let mut content_file = OpenOptions::new()
         .create(true)
         .append(true)
-        .open(format!("{}.txt", args.output_path))
-        .unwrap();
+        .open(&path_content_file)
+        .unwrap_or_else(|err| {
+            Args::command()
+                .error(
+                    ErrorKind::Io,
+                    format!("Failed to open file {path_content_file}. {err}"),
+                )
+                .exit()
+        });
     let mut index_file = OpenOptions::new()
         .create(true)
         .write(true)
-        .open(format!("{}.csv", args.output_path))
-        .unwrap();
+        .open(&path_index_file)
+        .unwrap_or_else(|err| {
+            Args::command()
+                .error(
+                    ErrorKind::Io,
+                    format!("Failed to open file {path_index_file}. {err}"),
+                )
+                .exit()
+        });
     let bar = if args.number_of_articles != -1 {
         let bar = ProgressBar::new(args.number_of_articles as u64);
         bar.set_style(
@@ -174,7 +218,16 @@ fn generate_single_file_with_index(args: Args) -> Result<()> {
         usize::MAX
     }) {
         let text = article.content.trim();
-        content_file.write_all(text.as_bytes()).unwrap();
+        content_file
+            .write_all(text.as_bytes())
+            .unwrap_or_else(|err| {
+                Args::command()
+                    .error(
+                        ErrorKind::Io,
+                        format!("Failed to write content file. {err}"),
+                    )
+                    .exit()
+            });
         offsets.push(current_text_offset);
         current_text_offset += text.len();
         if args.number_of_articles != -1 {
@@ -192,7 +245,11 @@ fn generate_single_file_with_index(args: Args) -> Result<()> {
                 .join(",")
                 .as_bytes(),
         )
-        .unwrap();
+        .unwrap_or_else(|err| {
+            Args::command()
+                .error(ErrorKind::Io, format!("Failed to write index file. {err}"))
+                .exit()
+        });
     bar.finish();
     Ok(())
 }
