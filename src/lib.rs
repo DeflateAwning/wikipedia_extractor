@@ -1,20 +1,26 @@
 #![doc = include_str!("../README.md")]
-use std::io::BufReader;
+use bzip2::read::BzDecoder;
+use std::io::{BufReader, Read};
 use std::{fs::File, io::Result};
 
 use xml::reader::{EventReader, Events, XmlEvent};
 
 /// An iterator over Wikipedia articles
 pub struct WikipediaIterator {
-    iter: Events<BufReader<File>>,
+    iter: Events<BufReader<Box<dyn Read>>>,
 }
 
 impl WikipediaIterator {
-    /// create a new Iterator given the path to a Wikipedia XML dump
+    /// Create a new iterator given the path to a Wikipedia XML dump.
+    /// Accepts both plain `.xml` files and bzip2-compressed `.xml.bz2` files.
     pub fn new(path: &str) -> Result<WikipediaIterator> {
         let file = File::open(path)?;
-        let file = BufReader::new(file);
-        let parser = EventReader::new(file);
+        let reader: Box<dyn Read> = if path.ends_with(".bz2") {
+            Box::new(BzDecoder::new(file))
+        } else {
+            Box::new(file)
+        };
+        let parser = EventReader::new(BufReader::new(reader));
         let iter = parser.into_iter();
 
         Ok(WikipediaIterator { iter })

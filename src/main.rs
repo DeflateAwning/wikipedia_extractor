@@ -17,7 +17,7 @@ enum OutputFormat {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// Path to the xml file containing the dump
+    /// Path to the xml or xml.bz2 file containing the dump
     #[arg(short, long)]
     path: String,
 

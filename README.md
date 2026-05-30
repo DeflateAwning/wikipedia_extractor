@@ -14,7 +14,7 @@ Usage: wiki_extractor [OPTIONS] --path <PATH> --output-path <OUTPUT_PATH> --outp
 
 Options:
   -p, --path <PATH>
-          Path to the xml file containing the dump
+          Path to the xml or xml.bz2 file containing the dump
   -n, --number-of-articles <NUMBER_OF_ARTICLES>
           Number of articles to extract. -1 will extract all articles [default: -1]
   -o, --output-path <OUTPUT_PATH>
@@ -35,18 +35,22 @@ Options:
 ### Example
 Generate `out.txt` and `out.csv` for the first 1000 articles
 ```
-cargo run --release -- -p ./wiki.xml -n 1000 -o ./out --output-format=single-file-with-index
+cargo run --release -- -p ./wiki.xml.bz2 -n 1000 -o ./out --output-format=single-file-with-index
 ```
 
 Generate one file per article in `out/` for the first 1000 articles
 ```
-cargo run --release -- -p ./wiki.xml -n 1000 -o ./out --output-format=files
+cargo run --release -- -p ./wiki.xml.bz2 -n 1000 -o ./out --output-format=files
 ```
+
+Both `.xml` and `.xml.bz2` inputs are supported. Wikipedia distributes dumps as `.xml.bz2` files (e.g. `enwiki-latest-articles.xml.bz2`), which can be used directly without decompressing first.
 
 ## Usage Lib
 ```rust
 use wiki_extractor::WikipediaIterator;
-let article_iter = WikipediaIterator::new("./wiki.xml")?;
+
+// Works with plain XML or bzip2-compressed XML
+let article_iter = WikipediaIterator::new("./wiki.xml.bz2")?;
 for article in article_iter {
   println!("title: {}\n content: {}", article.title, article.content);
 }
