@@ -1,5 +1,5 @@
 #![doc = include_str!("../README.md")]
-use bzip2::read::BzDecoder;
+use bzip2::read::MultiBzDecoder;
 use std::io::{BufReader, Read};
 use std::{fs::File, io::Result};
 
@@ -16,7 +16,7 @@ impl WikipediaIterator {
     pub fn new(path: &str) -> Result<WikipediaIterator> {
         let file = File::open(path)?;
         let reader: Box<dyn Read> = if path.ends_with(".bz2") {
-            Box::new(BzDecoder::new(file))
+            Box::new(MultiBzDecoder::new(file))
         } else {
             Box::new(file)
         };
